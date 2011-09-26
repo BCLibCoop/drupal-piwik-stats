@@ -1,0 +1,275 @@
+<?php
+/**
+ * @file
+ * Integrates piwik statistics per node.
+ */
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Adds piwik_stats settings to piwik configuration.
+ */
+function piwik_stats_form_piwik_admin_settings_form_alter(&$form, &$form_state, $form_id) {
+  // Create a new fieldset for piwik stats settings.
+  $form['stats'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Piwik Statisitic Integration settings'),
+  );
+  // Add authentication token settings.
+  $form['stats']['piwik_stats_token_auth'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Piwik authentication token'),
+    '#default_value' => variable_get('piwik_stats_token_auth', ''),
+    '#size' => 80,
+    '#maxlength' => 34,
+    '#required' => TRUE,
+    '#description' => t('This is needed by piwik statistic integration to request statistical data.'),
+  );
+  // Add settings for statistic period.
+  $form['stats']['piwik_stats_period'] = array(
+    '#type' => 'select',
+    '#title' => t('Period'),
+    '#default_value' => variable_get('piwik_stats_period', 'year'),
+    '#options' => array(
+      'day' => t('Day'),
+      'week' => t('Week'),
+      'month' => t('Month'),
+      'year' => t('Year'),
+    ),
+    '#required' => TRUE,
+    '#description' => t('The statistical period of requested statistics.'),
+  );
+  // Add cron run settings.
+  $form['stats']['piwik_stats_cron'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Refresh on cron run'),
+    '#default_value' => variable_get('piwik_stats_cron', FALSE),
+    '#description' => t('If enabled, piwik statistics will be refreshed on cron run.'),
+  );
+  // Add submit callback to save input.
+  $form['#submit'][] = 'piwik_stats_piwik_admin_settings_form_submit';
+  // Submit button for refreshing piwik_stats table.
+  $form['actions']['request_piwik_stats'] = array(
+    '#type' => 'submit',
+    '#submit' => array('piwik_stats_piwik_admin_settings_request_statistical_data_submit'),
+    '#value' => t('Refresh Piwik Statistic data'),
+  );
+}
+
+/**
+ * Submit callback for piwik configuration form.
+ */
+function piwik_stats_piwik_admin_settings_form_submit($form, &$form_state) {
+  // Trim and save authentication token.
+  variable_set('piwik_stats_token_auth', trim($form_state['input']['piwik_stats_token_auth']));
+}
+
+/**
+ * Submit callback for refreshing piwik_stats data.
+ */
+function piwik_stats_piwik_admin_settings_request_statistical_data_submit($form, &$form_state) {
+  $result = piwik_stats_request_data(
+    variable_get('piwik_stats_token_auth', ''),
+    variable_get('piwik_site_id', 0),
+    variable_get('piwik_url_http', ''),
+    variable_get('piwik_stats_period', 'year')
+  );
+
+  if ($result === TRUE) {
+    drupal_set_message(t('All Piwik Statistical data was refreshed successfully.'));
+  }
+  else {
+    drupal_set_message(t('Piwik Statistical data could not be refreshed.'), 'error');
+  }
+}
+
+/**
+ * Implements hook_cron().
+ *
+ * If set, statistical piwik data will be refreshed on cron run.
+ */
+function piwik_stats_cron() {
+  if (variable_get('piwik_stats_cron', FALSE)) {
+    piwik_stats_request_data(
+      variable_get('piwik_stats_token_auth', ''),
+      variable_get('piwik_site_id', 0),
+      variable_get('piwik_url_http', ''),
+      variable_get('piwik_stats_period', 'year')
+    );
+  }
+}
+
+/**
+ * Requests and refreshes the Piwik Statistical data.
+ *
+ * @param $token_auth
+ *   Authentication token needed to authenticate with piwik.
+ * @param $site_id
+ *   Unique site ID of piwik.
+ * @param $piwik_url
+ *   URL to piwik.
+ * @param $period
+ *   Statistical period.
+ */
+function piwik_stats_request_data($token_auth, $site_id, $piwik_url, $period) {
+  if (empty($token_auth) || empty($site_id) || empty($piwik_url)) {
+    watchdog('piwik_stats', 'Requesting Piwik Statistics failed: Authentication token, site ID and HTTP URL are required', array(), WATCHDOG_ERROR);
+    return;
+  }
+
+  // Request piwik XML data.
+  $result = piwik_stats_api_request($piwik_url, $token_auth, 'Actions.getPageUrls', $site_id, $period);
+  if ($result->code ==! 200) {
+    watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @code.', array('@code' => $result->code), WATCHDOG_ERROR);
+    return;
+  }
+
+  // Parse XML data.
+  $xml = new SimpleXMLElement($result->data);
+  if (empty($xml)) {
+    watchdog('piwik_stats', 'Requesting Piwik Statistics failed: Could not parse XML.', array(), WATCHDOG_ERROR);
+    return;
+  }
+
+  // Flush piwik statistic table.
+  db_truncate('piwik_stats')->execute();
+
+  // Get all nodes.
+  $select = db_select('node', 'n');
+  $select->addField('n', 'nid');
+  $nodes = $select->execute()->fetchAll();
+  foreach ($nodes as $node) {
+    $urls = array();
+
+    // Assemble default absolute node URL.
+    $urls[] = url('node/' . $node->nid, array('absolute' => TRUE, 'alias' => TRUE));
+    // Get absulute alias URLs.
+    $select = db_select('url_alias', 'u');
+    $select->addField('u', 'alias');
+    $select->condition('u.source', 'node/' . $node->nid);
+    $aliases = $select->execute()->fetchAll();
+    foreach ($aliases as $alias) {
+      $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE));
+    }
+
+    // Create a default statistic array for db_insert.
+    $stats = array(
+      'nid' => $node->nid,
+      'nb_visits' => 0,
+      'nb_hits' => 0,
+      'entry_nb_visits' => 0,
+      'entry_nb_actions' => 0,
+      'entry_sum_visit_length' => 0,
+      'entry_bounce_count' => 0,
+      'exit_nb_visits' => 0,
+      'sum_time_spend' => 0,
+      'avg_time_on_page' => 0,
+      'bounce_rate' => 0,
+      'exit_rate' => 0,
+    );
+
+    // Sum up statistics per url and write them into the statistic array.
+    $count = 0;
+    foreach ($urls as $url) {
+      $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
+      if (!empty($url_stats)) {
+        $count++;
+        // The following values are integers and can be summed up easily.
+        if (isset($url_stats[0]->nb_visits)) {
+          $stats['nb_visits'] += $url_stats[0]->nb_visits;
+        }
+        if (isset($url_stats[0]->nb_hits)) {
+          $stats['nb_hits'] += $url_stats[0]->nb_hits;
+        }
+        if (isset($url_stats[0]->entry_nb_visits)) {
+          $stats['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
+        }
+        if (isset($url_stats[0]->entry_nb_actions)) {
+          $stats['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
+        }
+        if (isset($url_stats[0]->entry_sum_visit_length)) {
+          $stats['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
+        }
+        if (isset($url_stats[0]->entry_bounce_count)) {
+          $stats['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
+        }
+        if (isset($url_stats[0]->exit_nb_visits)) {
+          $stats['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
+        }
+        if (isset($url_stats[0]->sum_time_spend)) {
+          $stats['sum_time_spend'] += $url_stats[0]->sum_time_spend;
+        }
+        // This is an average value. It needs to be divided by count later.
+        if (isset($url_stats[0]->avg_time_on_page)) {
+          $stats['avg_time_on_page'] += $url_stats[0]->avg_time_on_page;
+        }
+        // These two are percent values (##% formatted).
+        // We need to transform them to integers before we can sum them up.
+        if (isset($url_stats[0]->bounce_rate)) {
+          $stats['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
+        }
+        if (isset($url_stats[0]->exit_rate)) {
+          $stats['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
+        }
+      }
+    }
+    // Divide it, to get a real average value.
+    if (isset($stats['avg_time_on_page'])) {
+      $stats['avg_time_on_page'] = (int) ($stats['avg_time_on_page'] / $count);
+    }
+
+    // Insert statistical data.
+    db_insert('piwik_stats')
+      ->fields($stats)
+      ->execute();
+  }
+
+  // Clean up the huge xml stuff.
+  unset($result, $xml);
+
+  watchdog('piwik_stats', 'Piwik Statistical data was requested and refreshed successfully.');
+  return TRUE;
+}
+
+/**
+ * Sends a Piwik API request.
+ *
+ * @param $piwik_url
+ *   URL to piwik.
+ * @param $token_auth
+ *   Authentication token needed to authenticate with piwik.
+ * @param $method
+ *   Piwik API request method.
+ * @param $site_id
+ *   Unique site ID of piwik.
+ * @param $period
+ *   Statistical period. Default is 'year' but also 'day', 'week' or 'month' is possible.
+ * @param $date
+ *   Statistic base date.
+ * @param $format
+ *   API return format. Default is XML but also CSV, TSV and JSON is possible.
+ * @return
+ *   The returned object of drupal_http_request().
+ */
+function piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml') {
+  $result_object = drupal_http_request(url($piwik_url, array('query' => array(
+    'module' => 'API',
+    'method' => $method,
+    'idSite' => $site_id,
+    'period' => $period,
+    'date' => $date,
+    'format' => $format,
+    'token_auth' => $token_auth,
+    'expanded' => TRUE,
+  ))));
+  return $result_object;
+}
+
+/**
+ * Implements hook_views_api().
+ *
+ * Register to Views API so include files will be loaded.
+ */
+function piwik_stats_views_api() {
+  return array('api' => 3);
+}
