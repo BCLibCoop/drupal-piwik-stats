@@ -1,0 +1,6 @@
+name = Piwik Statistic Integration
+description = Integrates piwik statistics per node.
+core = 7.x
+configure = admin/config/system/piwik
+dependencies[] = piwik
+file[] = piwik_stats.views.inc
