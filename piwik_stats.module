@@ -96,7 +96,7 @@ function piwik_stats_node_statistics($type, $object, $name = NULL) {
         ),
         'entry_sum_visit_length' => array(
           t('Time spent, by visits that started on this node'),
-          t('@count sec', array('@count' => $statistics[0]->entry_sum_visit_length)),
+          format_interval($statistics[0]->entry_sum_visit_length),
         ),
         'entry_bounce_count' => array(
           t('Number of visits that started on this node and bounced'),
@@ -108,11 +108,11 @@ function piwik_stats_node_statistics($type, $object, $name = NULL) {
         ),
         'sum_time_spent' => array(
           t('Total time spent on this node'),
-          t('@count sec', array('@count' => $statistics[0]->sum_time_spent)),
+          format_interval($statistics[0]->sum_time_spent),
         ),
         'avg_time_on_page' => array(
           t('Average time spent on node'),
-          t('@count sec', array('@count' => $statistics[0]->avg_time_on_page)),
+          format_interval($statistics[0]->avg_time_on_page),
         ),
         'bounce_rate' => array(
           t('Ratio of visitors leaving the website after landing on this node'),
