@@ -3,6 +3,28 @@
  * @file
  * Integrates piwik statistics per node.
  */
+ 
+/**
+ * Implements hook_help().
+ */
+function piwik_stats_help($path, $arg) {
+  switch ($path) {
+    case 'admin/help#piwik_stats':
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('This module integrates piwik statistics per node.') . '</p>';
+      $output .= '<h3>' . t('Usage') . '</h3>';
+      $output .= '<dl>';
+      $output .= '<dt>' . t('Configuration') . '</dt>';
+      $output .= '<dd>' . t("Go to the <a href='@piwik'>piwik configuration page</a> and set the authentication token of your piwik user account. Then choose the period for which the statistics will be requested and whether you want to refresh the statistical data on cron run. To request the statistics immediately, save your settings and hit the 'Refresh Piwik Statistic data' button.",
+        array('@piwik' => url('admin/config/system/piwik'))) . '</dd>';
+      $output .= '<dt>' . t('Use') . '</dt>';
+      $output .= '<dd>' . t("This module comes with a full views integration and makes it easy for you to create things like top lists or just a statistical block for your dashboard. To access statistics per node, go to any node and click on the 'Piwik' tab (<a href='@permissions'>Permission 'View Piwik statistic tab' required</a>).",
+        array('@permissions' => url('admin/people/permissions/list'))) . '</dd>';
+      $output .= '</dl>';
+      return $output;
+  }
+}
+
 
 /**
  * Implements hook_form_FORM_ID_alter().
