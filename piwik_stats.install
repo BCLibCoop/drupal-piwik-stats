@@ -45,7 +45,7 @@ function piwik_stats_schema() {
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Time spend, in seconds, by visits that started on this node.',
+        'description' => 'Time spent, in seconds, by visits that started on this node.',
       ),
       'entry_bounce_count' => array(
         'type' => 'int',
@@ -59,17 +59,17 @@ function piwik_stats_schema() {
         'default' => 0,
         'description' => 'Number of visits that finished on this node.',
       ),
-      'sum_time_spend' => array(
+      'sum_time_spent' => array(
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Total time spend on this node, in seconds.',
+        'description' => 'Total time spent on this node, in seconds.',
       ),
       'avg_time_on_page' => array(
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Average time spend on node (in seconds).',
+        'description' => 'Average time spent on node (in seconds).',
       ),
       'bounce_rate' => array(
         'type' => 'int',
@@ -93,7 +93,7 @@ function piwik_stats_schema() {
       'entry_sum_visit_length' => array('entry_sum_visit_length'),
       'entry_bounce_count' => array('entry_bounce_count'),
       'exit_nb_visits' => array('exit_nb_visits'),
-      'sum_time_spend' => array('sum_time_spend'),
+      'sum_time_spent' => array('sum_time_spent'),
       'avg_time_on_page' => array('avg_time_on_page'),
       'bounce_rate' => array('bounce_rate'),
       'exit_rate' => array('exit_rate'),

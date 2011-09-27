@@ -25,6 +25,108 @@ function piwik_stats_help($path, $arg) {
   }
 }
 
+/**
+ * Implements hook_permission().
+ */
+function piwik_stats_permission() {
+  return array(
+    'view piwik statistic tab' => array(
+      'title' => t('View Piwik statistic tab'),
+      'description' => t('Access Piwik statistics tab on node.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function piwik_stats_menu() {
+  $items['node/%node/piwik'] = array(
+    'title' => 'Piwik Statistics',
+    'page callback' => 'piwik_stats_node_statistics',
+    'page arguments' => array('node', 1),
+    'access arguments' => array('view piwik statistic tab'),
+    'type' => MENU_LOCAL_TASK,
+  );
+  return $items;
+}
+
+/**
+ * Menu callback; prints available statistics of current node.
+ */
+function piwik_stats_node_statistics($type, $object, $name = NULL) {
+  // Get statistical data of node from database.
+  $select = db_select('piwik_stats', 'p');
+  $select->addField('p', 'nb_visits');
+  $select->addField('p', 'nb_hits');
+  $select->addField('p', 'entry_nb_visits');
+  $select->addField('p', 'entry_nb_actions');
+  $select->addField('p', 'entry_sum_visit_length');
+  $select->addField('p', 'entry_bounce_count');
+  $select->addField('p', 'exit_nb_visits');
+  $select->addField('p', 'sum_time_spent');
+  $select->addField('p', 'avg_time_on_page');
+  $select->addField('p', 'bounce_rate');
+  $select->addField('p', 'exit_rate');
+  $select->condition('p.nid', $object->nid);
+  $statistics = $select->execute()->fetchAll();
+  // Render it to a table.
+  return theme_table(
+    array(
+      'header' => array(
+        t('Description'),
+        t('Value'),
+      ),
+      'rows' => array(
+        'nb_visits' => array(
+          t('Unique pageviews'),
+          $statistics[0]->nb_visits,
+        ),
+        'nb_hits' => array(
+          t('Pageviews'),
+          $statistics[0]->nb_hits,
+        ),
+        'entry_nb_visits' => array(
+          t('Number of visits that started on a node'),
+          $statistics[0]->entry_nb_visits,
+        ),
+        'entry_nb_actions' => array(
+          t('Number of page views for visits that started on that node'),
+          $statistics[0]->entry_nb_actions,
+        ),
+        'entry_sum_visit_length' => array(
+          t('Time spent, by visits that started on this node'),
+          t('@count sec', array('@count' => $statistics[0]->entry_sum_visit_length)),
+        ),
+        'entry_bounce_count' => array(
+          t('Number of visits that started on this node and bounced'),
+          $statistics[0]->entry_bounce_count,
+        ),
+        'exit_nb_visits' => array(
+          t('Number of visits that finished on this node'),
+          $statistics[0]->exit_nb_visits,
+        ),
+        'sum_time_spent' => array(
+          t('Total time spent on this node'),
+          t('@count sec', array('@count' => $statistics[0]->sum_time_spent)),
+        ),
+        'avg_time_on_page' => array(
+          t('Average time spent on node'),
+          t('@count sec', array('@count' => $statistics[0]->avg_time_on_page)),
+        ),
+        'bounce_rate' => array(
+          t('Ratio of visitors leaving the website after landing on this node'),
+          t('@count%', array('@count' => $statistics[0]->bounce_rate)),
+        ),
+        'exit_rate' => array(
+          t('Ratio of visitors that do not view any other page after this node'),
+          t('@count%', array('@count' => $statistics[0]->exit_rate)),
+        ),
+      ),
+      'attributes' => array('piwik-statistics'),
+    )
+  );
+}
 
 /**
  * Implements hook_form_FORM_ID_alter().
@@ -184,7 +286,7 @@ function piwik_stats_request_data($token_auth, $site_id, $piwik_url, $period) {
       'entry_sum_visit_length' => 0,
       'entry_bounce_count' => 0,
       'exit_nb_visits' => 0,
-      'sum_time_spend' => 0,
+      'sum_time_spent' => 0,
       'avg_time_on_page' => 0,
       'bounce_rate' => 0,
       'exit_rate' => 0,
@@ -218,8 +320,8 @@ function piwik_stats_request_data($token_auth, $site_id, $piwik_url, $period) {
         if (isset($url_stats[0]->exit_nb_visits)) {
           $stats['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
         }
-        if (isset($url_stats[0]->sum_time_spend)) {
-          $stats['sum_time_spend'] += $url_stats[0]->sum_time_spend;
+        if (isset($url_stats[0]->sum_time_spent)) {
+          $stats['sum_time_spent'] += $url_stats[0]->sum_time_spent;
         }
         // This is an average value. It needs to be divided by count later.
         if (isset($url_stats[0]->avg_time_on_page)) {
@@ -236,7 +338,7 @@ function piwik_stats_request_data($token_auth, $site_id, $piwik_url, $period) {
       }
     }
     // Divide it, to get a real average value.
-    if (isset($stats['avg_time_on_page'])) {
+    if (isset($url_stats[0]->sum_time_spent)) {
       $stats['avg_time_on_page'] = (int) ($stats['avg_time_on_page'] / $count);
     }
 
