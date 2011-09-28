@@ -23,7 +23,7 @@ Features
   * Refresh statistics on cron run
 
 Todo
-  * Specific periodical choise
+  * Possibility to store more than one date range
 
 -- REQUIREMENTS --
 
