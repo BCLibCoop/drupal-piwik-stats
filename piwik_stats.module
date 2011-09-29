@@ -70,6 +70,13 @@ function piwik_stats_node_statistics($type, $object, $name = NULL) {
   $select->addField('p', 'exit_rate');
   $select->condition('p.nid', $object->nid);
   $statistics = $select->execute()->fetchAll();
+  
+  // Abort if no data is available.
+  if (empty($statistics)) {
+    drupal_set_message(t('There is no statistical data available for this node yet.'));
+    drupal_goto('node/' . $object->nid);
+  }
+  
   // Render it to a table.
   return theme_table(
     array(
