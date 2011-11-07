@@ -32,7 +32,7 @@ Piwik Web analytics (http://drupal.org/project/piwik)
 
 -- How to use it? --
 
-Install as usual, see http://drupal.org/node/70151 for further information.
+Install as usual, see http://drupal.org/node/895232 for further information.
 
 Configuration
   Go to the piwik configuration page (admin/config/system/piwik) and set the authentication
