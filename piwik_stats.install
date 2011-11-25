@@ -1,22 +1,18 @@
 <?php
 /**
  * @file
- * Installation file of piwik statistic integration module.
+ * Installation file of piwik statistical field module.
  */
 
 /**
- * Implements hook_schema().
+ * Implements hook_field_schema().
+ *
+ * This defines the database schema of the piwik statistical field.
  */
-function piwik_stats_schema() {
-  // Schema of table `module_codes`
-  $schema['piwik_stats'] = array(
+function piwik_stats_field_schema($field) {
+  $schema = array(
     'description' => 'Stores statistical piwik data.',
-    'fields' => array(
-      'nid'  => array(
-        'type' => 'int',
-        'not null' => FALSE,
-        'description' => 'Refers to the node.',
-      ),
+    'columns' => array(
       'nb_visits' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -65,12 +61,6 @@ function piwik_stats_schema() {
         'default' => 0,
         'description' => 'Total time spent on this node, in seconds.',
       ),
-      'avg_time_on_page' => array(
-        'type' => 'int',
-        'not null' => TRUE,
-        'default' => 0,
-        'description' => 'Average time spent on node (in seconds).',
-      ),
       'bounce_rate' => array(
         'type' => 'int',
         'not null' => TRUE,
@@ -84,19 +74,10 @@ function piwik_stats_schema() {
         'description' => 'Ratio of visitors that do not view any other page after this node (in percent).',
       ),
     ),
-    'primary key' => array('nid'),
     'indexes' => array(
-      'nb_visits' => array('nb_visits'),
-      'nb_hits' => array('nb_hits'),
-      'entry_nb_visits' => array('entry_nb_visits'),
-      'entry_nb_actions' => array('entry_nb_actions'),
-      'entry_sum_visit_length' => array('entry_sum_visit_length'),
-      'entry_bounce_count' => array('entry_bounce_count'),
-      'exit_nb_visits' => array('exit_nb_visits'),
-      'sum_time_spent' => array('sum_time_spent'),
-      'avg_time_on_page' => array('avg_time_on_page'),
-      'bounce_rate' => array('bounce_rate'),
-      'exit_rate' => array('exit_rate'),
+      'visits' => array('nb_visits', 'entry_nb_visits', 'exit_nb_visits'),
+      'hits' => array('nb_hits', 'entry_nb_actions'),
+      'rate' => array('bounce_rate', 'exit_rate'),
     ),
   );
   return $schema;
@@ -108,6 +89,5 @@ function piwik_stats_schema() {
 function piwik_stats_uninstall() {
   // Delete used variables.
   variable_del('piwik_stats_token_auth');
-  variable_del('piwik_stats_period');
-  variable_del('piwik_stats_cron');
+  variable_del('piwik_stats_cron_fill');
 }

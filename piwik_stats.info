@@ -1,7 +1,6 @@
-name = Piwik Statistic Integration
-description = Integrates piwik statistics per node.
+name = Piwik Statistical Field
+description = Integrates piwik statistics as entity field.
 package = Statistics
 core = 7.x
 configure = admin/config/system/piwik
 dependencies[] = piwik
-file[] = piwik_stats.views.inc
