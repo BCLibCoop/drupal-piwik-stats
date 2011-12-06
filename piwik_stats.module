@@ -252,7 +252,7 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
                 $stats['und'][0]['sum_time_spent'] += $url_stats[0]->sum_time_spent;
               }
               // These two are percent values (##% formatted).
-              // We need to transform them to integers before we can sum them up.
+              // We need to transform them to integers before we can sum them.
               if (isset($url_stats[0]->bounce_rate)) {
                 $stats['und'][0]['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
               }
@@ -290,7 +290,8 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
  * @param int $site_id
  *   Unique site ID of piwik.
  * @param string $period
- *   Statistical period. Default is 'year' but also 'day', 'week' or 'month' is possible.
+ *   Statistical period.
+ *   Default is 'year' but also 'day', 'week' or 'month' is possible.
  * @param int $date
  *   Statistic base date.
  * @param string $format
