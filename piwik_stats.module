@@ -46,64 +46,14 @@ function piwik_stats_field_settings_form($field, $instance, $has_data) {
  * Implements hook_field_formatter_info().
  */
 function piwik_stats_field_formatter_info() {
-  /*return array(
-    // This formatter displays all available piwik statistics.
-    'piwik_stats_statistics_text' => array(
-      'label' => t('Full, text statistics'),
-      'field types' => array('piwik_stats'),
-    ),
-    // This formatter displays the node hits.
-    'piwik_stats_statistics_hits' => array(
-      'label' => t('Pageviews'),
-      'field types' => array('piwik_stats'),
-    ),
-    // This formatter displays the node visitors.
-    'piwik_stats_statistics_visitors' => array(
-      'label' => t('Unique pageviews'),
-      'field types' => array('piwik_stats'),
-    ),
-  );*/
+  // TODO Implement some nice formatters.
 }
 
 /**
  * Implements hook_field_formatter_view().
  */
 function piwik_stats_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
-  /*$element = array();
-  
-  switch ($display['type']) {
-    // This formatter displays all available piwik statistics.
-    case 'piwik_stats_statistics_text':
-      foreach ($items as $delta => $item) {
-        if ($item['hits'] === NULL || $item['hits'] == 0) {
-          $element[$delta]['#markup'] = '<p class="piwik_stats">' . t('There is no statistical information available yet.') . '</p>';
-        }
-        else {
-          $element[$delta]['#markup'] = '<p class="piwik_stats">'
-            . '<div class="visits">' . t('Unique pageviews: @visits', array('@visits' => $item['visits']))
-            . '<div class="hits">' . t('Pageviews: @hits', array('@hits' => $item['hits']))
-            . '<div class="time">' . t('Avg. time on page: @time', array('@time' => $item['time'])) // TODO Format seconds.
-            . '</p>';
-        }
-      }
-      break;
-
-    // This formatter displays the node hits.
-    case 'piwik_stats_statistics_hits':
-      foreach ($items as $delta => $item) {
-        $element[$delta]['#markup'] = '<p class="piwik_stats">' . t('Pageviews: @hits', array('@hits' => (int)$item['hits'])) . '</p>';
-      }
-      break;
-      
-    // This formatter displays the node visitors.
-    case 'piwik_stats_statistics_visitors':
-      foreach ($items as $delta => $item) {
-        $element[$delta]['#markup'] = '<p class="piwik_stats">' . t('Unique pageviews: @visits', array('@visits' => (int)$item['visits'])) . '</p>';
-      }
-      break;
-  }
-  
-  return $element;*/
+  // TODO Implement some nice formatters.
 }
 
 /**
@@ -213,22 +163,22 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
   // First get all content types.
   $content_types = node_type_get_types();
   foreach ($content_types as $type => $data) {
-  
+
     // Get all fields of content type.
     $fields = field_info_instances('node', $type);
     foreach ($fields as $field => $data) {
-      
+
       // Get all piwik fields.
       $field_type = field_info_field($field);
       if ($field_type['type'] == 'piwik_stats') {
-      
+
         // Request piwik XML data.
         $result = _piwik_stats_api_request($piwik_url, $token_auth, 'Actions.getPageUrls', $site_id, $field_type['settings']['period']);
         if ($result->code ==! 200) {
           watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @code.', array('@code' => $result->code), WATCHDOG_ERROR);
           return;
         }
-        
+
         // Parse XML data.
         $xml = new SimpleXMLElement($result->data);
         if (empty($xml)) {
@@ -245,7 +195,7 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
         $nodes = $select->execute()->fetchAll();
         foreach ($nodes as $node) {
           $urls = array();
-          
+
           // Assemble default absolute node URL.
           $urls[] = url('node/' . $node->nid, array('absolute' => TRUE, 'alias' => TRUE));
           // Get absulute alias URLs.
@@ -256,7 +206,7 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
           foreach ($aliases as $alias) {
             $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE));
           }
-          
+
           // Initialize field values as needed.
           $stats = array();
           $stats['und'][0]['nb_visits'] = 0;
@@ -269,12 +219,12 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
           $stats['und'][0]['sum_time_spent'] = 0;
           $stats['und'][0]['bounce_rate'] = 0;
           $stats['und'][0]['exit_rate'] = 0;
-         
+
           // Iterate thorugh all url aliases and sum up statistics.
           foreach ($urls as $url) {
             // Grab statistical data from XML.
             $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
-            
+
             if (!empty($url_stats)) {
               // The following values are integers and can be summed up easily.
               if (isset($url_stats[0]->nb_visits)) {
@@ -311,19 +261,19 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
               }
             }
           }
-          
+
           // Set Piwik Statistical Field.
           $node->$field = $stats;
           // And save it.
           field_attach_update('node', $node);
         }
-        
+
         // Clean up the huge xml stuff.
         unset($result, $xml);
       }
     }
   }
-  
+
   watchdog('piwik_stats', 'All Piwik Statistical Fields were filled successfully.');
   return TRUE;
 }
@@ -349,15 +299,21 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
  *   The returned object of drupal_http_request().
  */
 function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml') {
-  $result_object = drupal_http_request(url($piwik_url, array('query' => array(
-    'module' => 'API',
-    'method' => $method,
-    'idSite' => $site_id,
-    'period' => $period,
-    'date' => $date,
-    'format' => $format,
-    'token_auth' => $token_auth,
-    'expanded' => TRUE,
-  ))));
+  $result_object = drupal_http_request(
+    url($piwik_url,
+      array(
+        'query' => array(
+          'module' => 'API',
+          'method' => $method,
+          'idSite' => $site_id,
+          'period' => $period,
+          'date' => $date,
+          'format' => $format,
+          'token_auth' => $token_auth,
+          'expanded' => TRUE,
+        ),
+      ),
+    ),
+  );
   return $result_object;
 }
