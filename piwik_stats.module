@@ -119,7 +119,7 @@ function piwik_stats_piwik_admin_settings_fill_statistical_fields_submit($form, 
     variable_get('piwik_site_id', 0),
     variable_get('piwik_url_http', '')
   );
-  
+
   if ($result) {
     drupal_set_message(t('All Piwik Statistical Fields were filled successfully.'));
   }
@@ -146,11 +146,11 @@ function piwik_stats_cron() {
 /**
  * Re/Fills the Piwik Statistical Fields with statistical data.
  *
- * @param $token_auth
+ * @param string $token_auth
  *   Authentication token needed to authenticate with piwik.
- * @param $site_id
+ * @param int $site_id
  *   Unique site ID of piwik.
- * @param $piwik_url
+ * @param string $piwik_url
  *   URL to piwik.
  */
 function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
@@ -281,21 +281,22 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
 /**
  * Sends a Piwik API request.
  *
- * @param $piwik_url
+ * @param string $piwik_url
  *   URL to piwik.
- * @param $token_auth
+ * @param string $token_auth
  *   Authentication token needed to authenticate with piwik.
- * @param $method
+ * @param string $method
  *   Piwik API request method.
- * @param $site_id
+ * @param int $site_id
  *   Unique site ID of piwik.
- * @param $period
+ * @param string $period
  *   Statistical period. Default is 'year' but also 'day', 'week' or 'month' is possible.
- * @param $date
+ * @param int $date
  *   Statistic base date.
- * @param $format
+ * @param string $format
  *   API return format. Default is XML but also CSV, TSV and JSON is possible.
- * @return
+ *
+ * @return object
  *   The returned object of drupal_http_request().
  */
 function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml') {
