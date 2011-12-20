@@ -314,8 +314,8 @@ function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $p
           'token_auth' => $token_auth,
           'expanded' => TRUE,
         ),
-      ),
-    ),
+      )
+    )
   );
   return $result_object;
 }
