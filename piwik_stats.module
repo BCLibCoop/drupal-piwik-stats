@@ -2,7 +2,31 @@
 /**
  * @file
  * Integrates piwik statistics as entity field.
+ *
+ * TODO Implement a menu local task tab for showing statistical information
+ * on any entity, independend from it's content. With permission controll.
+ * TODO Implement a full views integration.
  */
+
+/**
+ * No errors while filling the piwik stats fields.
+ */
+define('PIWIK_STATS_OK', 0);
+
+/**
+ * A HTTP error occurred during the API request.
+ */
+define('PIWIK_STATS_ERROR_HTTP', 1);
+
+/**
+ * The returned XML data could not be parsed.
+ */
+define('PIWIK_STATS_ERROR_XML', 2);
+
+/**
+ * The returned XML data was empty and holds no data.
+ */
+define('PIWIK_STATS_NO_DATA', 3);
 
 /**
  * Implements hook_field_info().
@@ -111,20 +135,30 @@ function piwik_stats_piwik_admin_settings_form_submit($form, &$form_state) {
 }
 
 /**
- * Submit callback for filling piwik_stats fields.
+ * Submit callback for filling piwik_stats fields manually.
  */
 function piwik_stats_piwik_admin_settings_fill_statistical_fields_submit($form, &$form_state) {
-  $result = piwik_stats_fill_fields(
+  // Start filling the fields.
+  $status = piwik_stats_fill_fields(
     variable_get('piwik_stats_token_auth', ''),
     variable_get('piwik_site_id', 0),
     variable_get('piwik_url_http', '')
   );
 
-  if ($result) {
-    drupal_set_message(t('All Piwik Statistical Fields were filled successfully.'));
-  }
-  else {
-    drupal_set_message(t('Piwik Statistical Fields could not be filled.'), 'error');
+  // Check the result and print it.
+  switch ($status) {
+    case PIWIK_STATS_OK:
+      drupal_set_message(t('All Piwik Statistical Fields were filled successfully.'));
+      break;
+    case PIWIK_STATS_ERROR_HTTP:
+      drupal_set_message(t('Requesting Piwik Statistics failed: HTTP error.'), 'error');
+      break;
+    case PIWIK_STATS_ERROR_XML:
+      drupal_set_message(t('Requesting Piwik Statistics failed: Could not parse XML.'), 'error');
+      break;
+    case PIWIK_STATS_NO_DATA:
+      drupal_set_message(t('Requesting Piwik Statistics failed: There was no data available.'), 'error');
+      break;
   }
 }
 
@@ -135,11 +169,31 @@ function piwik_stats_piwik_admin_settings_fill_statistical_fields_submit($form, 
  */
 function piwik_stats_cron() {
   if (variable_get('piwik_stats_cron_fill', TRUE)) {
-    piwik_stats_fill_fields(
+    // Fill them!
+    $status = piwik_stats_fill_fields(
       variable_get('piwik_stats_token_auth', ''),
       variable_get('piwik_site_id', 0),
       variable_get('piwik_url_http', '')
     );
+
+    // Check the result and log it.
+    switch ($status) {
+      case PIWIK_STATS_OK:
+        watchdog('piwik_stats', 'All Piwik Statistical Fields were filled successfully.');
+        break;
+      case PIWIK_STATS_ERROR_HTTP:
+        watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @code.',
+          array('@code' => $result->code), WATCHDOG_ERROR);
+        break;
+      case PIWIK_STATS_ERROR_XML:
+        watchdog('piwik_stats', 'Requesting Piwik Statistics failed: Could not parse XML.',
+          array(), WATCHDOG_ERROR);
+        break;
+      case PIWIK_STATS_NO_DATA:
+        watchdog('piwik_stats', 'Requesting Piwik Statistics failed: There was no data available.',
+          array(), WATCHDOG_ERROR);
+        break;
+    }
   }
 }
 
@@ -152,134 +206,79 @@ function piwik_stats_cron() {
  *   Unique site ID of piwik.
  * @param string $piwik_url
  *   URL to piwik.
+ *
+ * @return int
+ *   Integer representing a status code.
  */
 function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
-  if (empty($token_auth) || empty($site_id) || empty($piwik_url)) {
-    watchdog('piwik_stats', 'Filling fields failed: Authentication token, site ID and HTTP URL are required', array(), WATCHDOG_ERROR);
-    return;
-  }
+  // Get all fields of type piwik_stats.
+  $piwik_fields = field_read_fields(array(
+    'type' => 'piwik_stats',
+  ));
 
-  // Get content types using Piwik Statistical Field.
-  // First get all content types.
-  $content_types = node_type_get_types();
-  foreach ($content_types as $type => $data) {
+  // Iterate through all piwik fields.
+  foreach ($piwik_fields as $field_name => $field) {
 
-    // Get all fields of content type.
-    $fields = field_info_instances('node', $type);
-    foreach ($fields as $field => $data) {
+    // Get all instances of a piwik_stats field.
+    $field_instances = field_read_instances(array(
+      'field_id' => $field['id'],
+    ));
 
-      // Get all piwik fields.
-      $field_type = field_info_field($field);
-      if ($field_type['type'] == 'piwik_stats') {
+    // Request piwik XML data.
+    $result = _piwik_stats_api_request(
+      $piwik_url,
+      $token_auth,
+      'Actions.getPageUrls',
+      $site_id,
+      $field['settings']['period']
+    );
+    // Check HTTP status code of response.
+    if ($result->code != 200 || $result->headers['content-type'] != 'text/xml; charset=utf-8') {
+      return PIWIK_STATS_ERROR_HTTP;
+    }
 
-        // Request piwik XML data.
-        $result = _piwik_stats_api_request($piwik_url, $token_auth, 'Actions.getPageUrls', $site_id, $field_type['settings']['period']);
-        if ($result->code ==! 200) {
-          watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @code.', array('@code' => $result->code), WATCHDOG_ERROR);
-          return;
-        }
+    // Parse XML data.
+    $xml = new SimpleXMLElement($result->data);
+    // Be shure that there is really some data to work with.
+    if (isset($xml->error)) {
+      return PIWIK_STATS_ERROR_XML;
+    }
+    elseif (empty($xml)) {
+      return PIWIK_STATS_NO_DATA;
+    }
 
-        // Parse XML data.
-        $xml = new SimpleXMLElement($result->data);
-        if (empty($xml)) {
-          watchdog('piwik_stats', 'Requesting Piwik Statistics failed: Could not parse XML.', array(), WATCHDOG_ERROR);
-          return;
-        }
+    // Iterate through all instances of a piwik field.
+    foreach ($field_instances as $field_instance) {
 
-        // Get all nodes of content type.
-        $select = db_select('node', 'n');
-        $select->addField('n', 'nid');
-        $select->addField('n', 'vid');
-        $select->addField('n', 'type');
-        $select->condition('n.type', $type);
-        $nodes = $select->execute()->fetchAll();
-        foreach ($nodes as $node) {
-          $urls = array();
+      // Get a list of all entity objects holding the needed id's.
+      $entities = _piwik_stats_get_entities($field_instance['entity_type'], $field_instance['bundle']);
 
-          // Assemble default absolute node URL.
-          $urls[] = url('node/' . $node->nid, array('absolute' => TRUE, 'alias' => TRUE));
-          // Get absulute alias URLs.
-          $select = db_select('url_alias', 'u');
-          $select->addField('u', 'alias');
-          $select->condition('u.source', 'node/' . $node->nid);
-          $aliases = $select->execute()->fetchAll();
-          foreach ($aliases as $alias) {
-            $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE));
-          }
+      // Iterate through the list of entities with fields to fill.
+      foreach ($entities as $entity) {
 
-          // Initialize field values as needed.
-          $stats = array();
-          $stats['und'][0]['nb_visits'] = 0;
-          $stats['und'][0]['nb_hits'] = 0;
-          $stats['und'][0]['entry_nb_visits'] = 0;
-          $stats['und'][0]['entry_nb_actions'] = 0;
-          $stats['und'][0]['entry_sum_visit_length'] = 0;
-          $stats['und'][0]['entry_bounce_count'] = 0;
-          $stats['und'][0]['exit_nb_visits'] = 0;
-          $stats['und'][0]['sum_time_spent'] = 0;
-          $stats['und'][0]['bounce_rate'] = 0;
-          $stats['und'][0]['exit_rate'] = 0;
+        // Get the default URI of the current entity.
+        $entity_uri = entity_uri($field_instance['entity_type'], $entity);
+        // Get all URL aliases linked to the entity URI.
+        $urls = _piwik_stats_get_aliases($entity_uri['path']);
 
-          // Iterate thorugh all url aliases and sum up statistics.
-          foreach ($urls as $url) {
-            // Grab statistical data from XML.
-            $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
+        // Sum up all statistical data of each URL to a piwik field.
+        $piwik_stats_field = _piwik_stats_summarize_field($urls, $xml);
+        // Add the filled piwik stats field to the entity.
+        $entity->$field_name = $piwik_stats_field;
 
-            if (!empty($url_stats)) {
-              // The following values are integers and can be summed up easily.
-              if (isset($url_stats[0]->nb_visits)) {
-                $stats['und'][0]['nb_visits'] += $url_stats[0]->nb_visits;
-              }
-              if (isset($url_stats[0]->nb_hits)) {
-                $stats['und'][0]['nb_hits'] += $url_stats[0]->nb_hits;
-              }
-              if (isset($url_stats[0]->entry_nb_visits)) {
-                $stats['und'][0]['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
-              }
-              if (isset($url_stats[0]->entry_nb_actions)) {
-                $stats['und'][0]['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
-              }
-              if (isset($url_stats[0]->entry_sum_visit_length)) {
-                $stats['und'][0]['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
-              }
-              if (isset($url_stats[0]->entry_bounce_count)) {
-                $stats['und'][0]['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
-              }
-              if (isset($url_stats[0]->exit_nb_visits)) {
-                $stats['und'][0]['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
-              }
-              if (isset($url_stats[0]->sum_time_spent)) {
-                $stats['und'][0]['sum_time_spent'] += $url_stats[0]->sum_time_spent;
-              }
-              // These two are percent values (##% formatted).
-              // We need to transform them to integers before we can sum them.
-              if (isset($url_stats[0]->bounce_rate)) {
-                $stats['und'][0]['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
-              }
-              if (isset($url_stats[0]->exit_rate)) {
-                $stats['und'][0]['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
-              }
-            }
-          }
-
-          // Set Piwik Statistical Field.
-          $node->$field = $stats;
-          // And save it.
-          field_attach_update('node', $node);
-        }
-
-        // Clean up the huge xml stuff.
-        unset($result, $xml);
+        // Save the updated piwik fields.
+        field_attach_update($field_instance['entity_type'], $entity);
       }
     }
   }
 
-  watchdog('piwik_stats', 'All Piwik Statistical Fields were filled successfully.');
-  return TRUE;
+  return PIWIK_STATS_OK;
 }
 
 /**
  * Sends a Piwik API request.
+ *
+ * TODO Think about caching response data here.
  *
  * @param string $piwik_url
  *   URL to piwik.
@@ -318,4 +317,132 @@ function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $p
     )
   );
   return $result_object;
+}
+
+/**
+ * Returns a list of entity objects only holding entity id's.
+ *
+ * TODO Think about caching data here.
+ *
+ * @param string $type
+ *   The entity type.
+ * @param string $bundle
+ *   The entity bundle.
+ *
+ * @return array
+ *   An array of lightweight entity objects as returned from database.
+ */
+function _piwik_stats_get_entities($type, $bundle) {
+  // Get information about entity type.
+  $entity_info = entity_get_info($type);
+
+  // Get all entity id's of a specific type and bundle.
+  $select = db_select($entity_info['base table'], 'b');
+  $select->addField('b', $entity_info['entity keys']['id']);
+  // Some entity tables neither have revisisons nor bundles.
+  if (! empty($entity_info['entity keys']['revision'])) {
+    $select->addField('b', $entity_info['entity keys']['revision']);
+  }
+  if (! empty($entity_info['entity keys']['bundle'])) {
+    $select->addField('b', $entity_info['entity keys']['bundle']);
+    $select->condition('b.type', $bundle);
+  }
+  $entities = $select->execute()->fetchAll();
+
+  return $entities;
+}
+
+/**
+ * Returns a list of url aliases of a system path.
+ *
+ * @param string $uri
+ *   A system path, eg. an entity URI.
+ *
+ * @return array
+ *   An array of url aliases.
+ */
+function _piwik_stats_get_aliases($uri) {
+  // The URLs we get from piwik are absolute, so we transform them as needed.
+  $urls = array(url($uri, array('absolute' => TRUE, 'alias' => TRUE)));
+
+  // Grab all URL aliases of the system URI.
+  $select = db_select('url_alias', 'u');
+  $select->addField('u', 'alias');
+  $select->condition('u.source', $uri);
+  $aliases = $select->execute()->fetchAll();
+  foreach ($aliases as $alias) {
+    $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE));
+  }
+
+  return $urls;
+}
+
+/**
+ * Summarizes all statistical data from XML with matching URLs.
+ *
+ * @param array $urls
+ *   An array of url aliases.
+ * @param object $xml
+ *   A XML object containing piwik URL statistics.
+ *
+ * @return array
+ *   An array representing the filled piwik_stats field.
+ */
+function _piwik_stats_summarize_field($urls, $xml) {
+  // Initialize field values as needed.
+  $stats = array();
+  $stats['und'][0]['nb_visits'] = 0;
+  $stats['und'][0]['nb_hits'] = 0;
+  $stats['und'][0]['entry_nb_visits'] = 0;
+  $stats['und'][0]['entry_nb_actions'] = 0;
+  $stats['und'][0]['entry_sum_visit_length'] = 0;
+  $stats['und'][0]['entry_bounce_count'] = 0;
+  $stats['und'][0]['exit_nb_visits'] = 0;
+  $stats['und'][0]['sum_time_spent'] = 0;
+  $stats['und'][0]['bounce_rate'] = 0;
+  $stats['und'][0]['exit_rate'] = 0;
+
+  // Iterate thorugh all url aliases and sum up statistics.
+  foreach ($urls as $url) {
+    // Grab statistical data from XML per URL.
+    $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
+
+    if (! empty($url_stats)) {
+      // The following values are integers and can be summed up easily.
+      if (isset($url_stats[0]->nb_visits)) {
+        $stats['und'][0]['nb_visits'] += $url_stats[0]->nb_visits;
+      }
+      if (isset($url_stats[0]->nb_hits)) {
+        $stats['und'][0]['nb_hits'] += $url_stats[0]->nb_hits;
+      }
+      if (isset($url_stats[0]->entry_nb_visits)) {
+        $stats['und'][0]['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
+      }
+      if (isset($url_stats[0]->entry_nb_actions)) {
+        $stats['und'][0]['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
+      }
+      if (isset($url_stats[0]->entry_sum_visit_length)) {
+        $stats['und'][0]['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
+      }
+      if (isset($url_stats[0]->entry_bounce_count)) {
+        $stats['und'][0]['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
+      }
+      if (isset($url_stats[0]->exit_nb_visits)) {
+        $stats['und'][0]['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
+      }
+      if (isset($url_stats[0]->sum_time_spent)) {
+        $stats['und'][0]['sum_time_spent'] += $url_stats[0]->sum_time_spent;
+      }
+      // These two are percent values (##% formatted).
+      // We need to transform them to integers before we can sum them.
+      if (isset($url_stats[0]->bounce_rate)) {
+        $stats['und'][0]['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
+      }
+      if (isset($url_stats[0]->exit_rate)) {
+        $stats['und'][0]['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
+      }
+    }
+  }
+
+  return $stats;
 }
