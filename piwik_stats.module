@@ -70,14 +70,195 @@ function piwik_stats_field_settings_form($field, $instance, $has_data) {
  * Implements hook_field_formatter_info().
  */
 function piwik_stats_field_formatter_info() {
-  // TODO Implement some nice formatters.
+  return array(
+    // The default piwik stats formatter lists statistics as configured.
+    'piwik_stats_list' => array(
+      'label' => t('Statistics list'),
+      'field types' => array('piwik_stats'),
+      'settings' => array(
+        'show_nb_visits' => TRUE,
+        'show_nb_hits' => TRUE,
+        'show_entry_nb_visits' => TRUE,
+        'show_entry_nb_actions' => TRUE,
+        'show_entry_sum_visit_length' => TRUE,
+        'show_entry_bounce_count' => TRUE,
+        'show_exit_nb_visits' => TRUE,
+        'show_sum_time_spent' => TRUE,
+        'show_bounce_rate' => TRUE,
+        'show_exit_rate' => TRUE,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ */
+function piwik_stats_field_formatter_settings_summary($field, $instance, $view_mode) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+
+  $summary = '';
+
+  // Generate a summary string for list formatter display settings.
+  if ($display['type'] === 'piwik_stats_list') {
+    // TODO do these listings more intelligent ;-).
+    $summary_elements = array();
+    if ($settings['show_nb_visits']) {
+      $summary_elements[] = t('Visits');
+    }
+    if ($settings['show_nb_hits']) {
+      $summary_elements[] = t('Hits');
+    }
+    if ($settings['show_entry_nb_visits']) {
+      $summary_elements[] = t('Entry visits');
+    }
+    if ($settings['show_entry_nb_actions']) {
+      $summary_elements[] = t('Entry hits');
+    }
+    if ($settings['show_entry_sum_visit_length']) {
+      $summary_elements[] = t('Visit length');
+    }
+    if ($settings['show_entry_bounce_count']) {
+      $summary_elements[] = t('Bounce count');
+    }
+    if ($settings['show_exit_nb_visits']) {
+      $summary_elements[] = t('Exiting visits');
+    }
+    if ($settings['show_sum_time_spent']) {
+      $summary_elements[] = t('Time spend');
+    }
+    if ($settings['show_bounce_rate']) {
+      $summary_elements[] = t('Bounce rate');
+    }
+    if ($settings['show_exit_rate']) {
+      $summary_elements[] = t('Exit rate');
+    }
+    if (! empty($summary_elements)) {
+      $summary = implode(', ', $summary_elements);
+    }
+    else {
+      $summary = t('None');
+    }
+  }
+
+  return $summary;
+}
+
+/**
+ * Implements hook_field_formatter_settings_form().
+ */
+function piwik_stats_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  $element = array();
+
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+
+  // Field display settings for the list formatter.
+  if ($display['type'] === 'piwik_stats_list') {
+    $element['show_nb_visits'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show visits'),
+      '#default_value' => $settings['show_nb_visits'],
+    );
+    $element['show_nb_hits'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show hits'),
+      '#default_value' => $settings['show_nb_hits'],
+    );
+    $element['show_entry_nb_visits'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show entry visits'),
+      '#default_value' => $settings['show_entry_nb_visits'],
+    );
+    $element['show_entry_nb_actions'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show entry hits'),
+      '#default_value' => $settings['show_entry_nb_actions'],
+    );
+    $element['show_entry_sum_visit_length'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show visit length'),
+      '#default_value' => $settings['show_entry_sum_visit_length'],
+    );
+    $element['show_entry_bounce_count'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show bounce count'),
+      '#default_value' => $settings['show_entry_bounce_count'],
+    );
+    $element['show_exit_nb_visits'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show exiting visits'),
+      '#default_value' => $settings['show_exit_nb_visits'],
+    );
+    $element['show_sum_time_spent'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show total time spend'),
+      '#default_value' => $settings['show_sum_time_spent'],
+    );
+    $element['show_bounce_rate'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show bounce rate'),
+      '#default_value' => $settings['show_bounce_rate'],
+    );
+    $element['show_exit_rate'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Show exit rate'),
+      '#default_value' => $settings['show_exit_rate'],
+    );
+  }
+  return $element;
 }
 
 /**
  * Implements hook_field_formatter_view().
  */
 function piwik_stats_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
-  // TODO Implement some nice formatters.
+  $element = array();
+  $settings = $display['settings'];
+
+  if ($display['type'] === 'piwik_stats_list') {
+    foreach ($items as $delta => $item) {
+      // Print the values in a html list as configured by field settings.
+      $list_elements = array();
+      // TODO do these listings more intelligent ;-).
+      if ($settings['show_nb_visits']) {
+        $list_elements[] = t('Visits: %count', array('%count' => $item['nb_visits']));
+      }
+      if ($settings['show_nb_hits']) {
+        $list_elements[] = t('Hits: %count', array('%count' => $item['nb_hits']));
+      }
+      if ($settings['show_entry_nb_visits']) {
+        $list_elements[] = t('Entry visits: %count', array('%count' => $item['entry_nb_visits']));
+      }
+      if ($settings['show_entry_nb_actions']) {
+        $list_elements[] = t('Entry hits: %count', array('%count' => $item['entry_nb_actions']));
+      }
+      if ($settings['show_entry_sum_visit_length']) {
+        $list_elements[] = t('Visit length: %count', array('%count' => $item['entry_sum_visit_length']));
+      }
+      if ($settings['show_entry_bounce_count']) {
+        $list_elements[] = t('Bounce count: %count', array('%count' => $item['entry_bounce_count']));
+      }
+      if ($settings['show_exit_nb_visits']) {
+        $list_elements[] = t('Exiting visits: %count', array('%count' => $item['exit_nb_visits']));
+      }
+      if ($settings['show_sum_time_spent']) {
+        $list_elements[] = t('Time spend: %count', array('%count' => $item['sum_time_spent']));
+      }
+      if ($settings['show_bounce_rate']) {
+        $list_elements[] = t('Bounce rate: %count%', array('%count' => $item['bounce_rate']));
+      }
+      if ($settings['show_exit_rate']) {
+        $list_elements[] = t('Exit rate: %count%', array('%count' => $item['exit_rate']));
+      }
+      $element[$delta] = array(
+        '#theme' => 'item_list',
+        '#items' => $list_elements,
+      );
+    }
+  }
+  return $element;
 }
 
 /**
