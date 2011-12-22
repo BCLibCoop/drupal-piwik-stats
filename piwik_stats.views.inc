@@ -32,7 +32,7 @@ function piwik_stats_field_views_data($field) {
           // Modify title fields.
           $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
           $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field handling information, so views will regard this as usable field.
+          // Add field information, so views will regard this as usable field.
           $data_field['field'] = array(
             'table' => $data_table,
             'handler' => 'views_handler_field_numeric',
@@ -53,7 +53,7 @@ function piwik_stats_field_views_data($field) {
           // Modify title fields.
           $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
           $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field handling information, so views will regard this as usable field.
+          // Add field information, so views will regard this as usable field.
           $data_field['field'] = array(
             'table' => $data_table,
             'handler' => 'views_handler_field_time_interval',
@@ -74,7 +74,7 @@ function piwik_stats_field_views_data($field) {
           // Modify title fields.
           $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name] . ' %', $data_field['title']);
           $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field handling information, so views will regard this as usable field.
+          // Add field information, so views will regard this as usable field.
           $data_field['field'] = array(
             'table' => $data_table,
             'handler' => 'views_handler_field_numeric',
