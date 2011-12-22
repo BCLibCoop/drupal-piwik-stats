@@ -52,7 +52,7 @@ function piwik_stats_menu() {
 }
 
 /**
- * Implement hook_permission().
+ * Implements hook_permission().
  */
 function piwik_stats_permission() {
   return array(
@@ -72,8 +72,8 @@ function piwik_stats_tab_page($entity_type, $entity) {
 
   // Some default options needed for _field_invoke_get_instances().
   $options = array(
-    'default' => FALSE, 
-    'deleted' => FALSE, 
+    'default' => FALSE,
+    'deleted' => FALSE,
     'language' => NULL,
   );
 
