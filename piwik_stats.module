@@ -3,8 +3,6 @@
  * @file
  * Integrates piwik statistics as entity field.
  *
- * TODO Implement a menu local task tab for showing statistical information
- * on any entity, independend from it's content. With permission controll.
  * TODO Implement a full views integration.
  */
 
@@ -27,6 +25,130 @@ define('PIWIK_STATS_ERROR_XML', 2);
  * The returned XML data was empty and holds no data.
  */
 define('PIWIK_STATS_NO_DATA', 3);
+
+/**
+ * Implements hook_menu().
+ */
+function piwik_stats_menu() {
+  // Lets provide a piwik statistics tab on nodes.
+  $items['node/%node/piwik'] = array(
+    'title' => 'Piwik statistics',
+    'page callback' => 'piwik_stats_tab_page',
+    'page arguments' => array('node', 1),
+    'access arguments' => array('access piwik information'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+  );
+  // Lets provide a piwik statistics tab on user pages.
+  $items['user/%user/piwik'] = array(
+    'title' => 'Piwik statistics',
+    'page callback' => 'piwik_stats_tab_page',
+    'page arguments' => array('user', 1),
+    'access arguments' => array('access piwik information'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10,
+  );
+  return $items;
+}
+
+/**
+ * Implement hook_permission().
+ */
+function piwik_stats_permission() {
+  return array(
+    // Permission for accessing the statistics tab on nodes, users etc.
+    'access piwik information' => array(
+      'description' => t('View piwik statistics tab on nodes, users etc.'),
+      'title' => t('Access piwik information'),
+    ),
+  );
+}
+
+/**
+ * Page callback to show statistical information on local task tabs.
+ */
+function piwik_stats_tab_page($entity_type, $entity) {
+  $tables = array();
+
+  // Some default options needed for _field_invoke_get_instances().
+  $options = array(
+    'default' => FALSE, 
+    'deleted' => FALSE, 
+    'language' => NULL,
+  );
+
+  // Determine the list of field instances to iterate on.
+  list(, , $bundle) = entity_extract_ids($entity_type, $entity);
+  $instances = _field_invoke_get_instances($entity_type, $bundle, $options);
+
+  // Iterate through all field instances of the entity, check if they are
+  // piwik statistical fields in order to render a table of their contents.
+  foreach ($instances as $field_name => $instance) {
+
+    // Get information about the field instance.
+    $field_info = field_info_field($field_name);
+
+    // Check if we've got a piwik stats field here.
+    if ($field_info['type'] == 'piwik_stats') {
+      // Grab it's contents.
+      $field = $entity->$field_name;
+      $language = (empty($entity->language)) ? LANGUAGE_NONE : $entity->language;
+      $field_contents = (isset($field[$language][0])) ? $field[$language][0] : array();
+
+      // Set table caption, headers and some other needed default values.
+      $tables[$field_name] = array(
+        'header' => array(
+          t('Description'),
+          t('Value'),
+        ),
+        'caption' => t('@field-label (period: %period)', array(
+          '@field-label' => $instance['label'],
+          '%period' => $field_info['settings']['period'],
+          )
+        ),
+        'colgroups' => array(),
+        'sticky' => FALSE,
+        'empty' => t('Sorry, no data available yet.'),
+        'attributes' => array('piwik-statistics', $field_name),
+        'rows' => array(),
+      );
+
+      // Get descriptions for piwik value keys.
+      $descriptions = piwik_stats_keyed_descriptions();
+      // Iterate trough all values and build the table.
+      foreach ($field_contents as $key => $value) {
+        // Set the describing value.
+        $tables[$field_name]['rows'][$key][] = $descriptions[$key];
+        // Set the statistical value depending on its type.
+        if ($key == 'entry_sum_visit_length' || $key == 'sum_time_spent') {
+          // Format value as date intervall.
+          $tables[$field_name]['rows'][$key][] = format_interval($value);
+        }
+        elseif ($key == 'exit_rate' || $key == 'bounce_rate') {
+          // Format as percent value.
+          $tables[$field_name]['rows'][$key][] = $value . '%';
+        }
+        else {
+          // None formatted value.
+          $tables[$field_name]['rows'][$key][] = $value;
+        }
+      }
+    }
+  }
+
+  // If there are no tables, there were no piwik fields.
+  if (empty($tables)) {
+    $output = array('#markup' => t('You have to add at least one piwik field to this entity.'));
+  }
+  else {
+    $output = '';
+    // Render each table.
+    foreach ($tables as $table) {
+      $output .= theme_table($table);
+    }
+  }
+  return $output;
+}
 
 /**
  * Implements hook_field_info().
@@ -76,16 +198,16 @@ function piwik_stats_field_formatter_info() {
       'label' => t('Statistics list'),
       'field types' => array('piwik_stats'),
       'settings' => array(
-        'show_nb_visits' => TRUE,
-        'show_nb_hits' => TRUE,
-        'show_entry_nb_visits' => TRUE,
-        'show_entry_nb_actions' => TRUE,
-        'show_entry_sum_visit_length' => TRUE,
-        'show_entry_bounce_count' => TRUE,
-        'show_exit_nb_visits' => TRUE,
-        'show_sum_time_spent' => TRUE,
-        'show_bounce_rate' => TRUE,
-        'show_exit_rate' => TRUE,
+        'nb_visits' => TRUE,
+        'nb_hits' => TRUE,
+        'entry_nb_visits' => TRUE,
+        'entry_nb_actions' => TRUE,
+        'entry_sum_visit_length' => TRUE,
+        'entry_bounce_count' => TRUE,
+        'exit_nb_visits' => TRUE,
+        'sum_time_spent' => TRUE,
+        'bounce_rate' => TRUE,
+        'exit_rate' => TRUE,
       ),
     ),
   );
@@ -102,38 +224,16 @@ function piwik_stats_field_formatter_settings_summary($field, $instance, $view_m
 
   // Generate a summary string for list formatter display settings.
   if ($display['type'] === 'piwik_stats_list') {
-    // TODO do these listings more intelligent ;-).
     $summary_elements = array();
-    if ($settings['show_nb_visits']) {
-      $summary_elements[] = t('Visits');
+    // Get key -> description listing of piwik.
+    $descriptions = piwik_stats_keyed_descriptions();
+    // Iterate through all keys and add them as summary element if set.
+    foreach ($descriptions as $key => $description) {
+      if ($settings[$key]) {
+        $summary_elements[] = $description;
+      }
     }
-    if ($settings['show_nb_hits']) {
-      $summary_elements[] = t('Hits');
-    }
-    if ($settings['show_entry_nb_visits']) {
-      $summary_elements[] = t('Entry visits');
-    }
-    if ($settings['show_entry_nb_actions']) {
-      $summary_elements[] = t('Entry hits');
-    }
-    if ($settings['show_entry_sum_visit_length']) {
-      $summary_elements[] = t('Visit length');
-    }
-    if ($settings['show_entry_bounce_count']) {
-      $summary_elements[] = t('Bounce count');
-    }
-    if ($settings['show_exit_nb_visits']) {
-      $summary_elements[] = t('Exiting visits');
-    }
-    if ($settings['show_sum_time_spent']) {
-      $summary_elements[] = t('Time spend');
-    }
-    if ($settings['show_bounce_rate']) {
-      $summary_elements[] = t('Bounce rate');
-    }
-    if ($settings['show_exit_rate']) {
-      $summary_elements[] = t('Exit rate');
-    }
+    // Build the summary string.
     if (! empty($summary_elements)) {
       $summary = implode(', ', $summary_elements);
     }
@@ -156,56 +256,16 @@ function piwik_stats_field_formatter_settings_form($field, $instance, $view_mode
 
   // Field display settings for the list formatter.
   if ($display['type'] === 'piwik_stats_list') {
-    $element['show_nb_visits'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show visits'),
-      '#default_value' => $settings['show_nb_visits'],
-    );
-    $element['show_nb_hits'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show hits'),
-      '#default_value' => $settings['show_nb_hits'],
-    );
-    $element['show_entry_nb_visits'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show entry visits'),
-      '#default_value' => $settings['show_entry_nb_visits'],
-    );
-    $element['show_entry_nb_actions'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show entry hits'),
-      '#default_value' => $settings['show_entry_nb_actions'],
-    );
-    $element['show_entry_sum_visit_length'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show visit length'),
-      '#default_value' => $settings['show_entry_sum_visit_length'],
-    );
-    $element['show_entry_bounce_count'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show bounce count'),
-      '#default_value' => $settings['show_entry_bounce_count'],
-    );
-    $element['show_exit_nb_visits'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show exiting visits'),
-      '#default_value' => $settings['show_exit_nb_visits'],
-    );
-    $element['show_sum_time_spent'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show total time spend'),
-      '#default_value' => $settings['show_sum_time_spent'],
-    );
-    $element['show_bounce_rate'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show bounce rate'),
-      '#default_value' => $settings['show_bounce_rate'],
-    );
-    $element['show_exit_rate'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Show exit rate'),
-      '#default_value' => $settings['show_exit_rate'],
-    );
+    // Get key -> description listing of piwik.
+    $descriptions = piwik_stats_keyed_descriptions();
+    // Iterate through all keys and add them as checkbox.
+    foreach ($descriptions as $key => $description) {
+      $element[$key] = array(
+        '#type' => 'checkbox',
+        '#title' => $description,
+        '#default_value' => $settings[$key],
+      );
+    }
   }
   return $element;
 }
@@ -221,36 +281,25 @@ function piwik_stats_field_formatter_view($entity_type, $entity, $field, $instan
     foreach ($items as $delta => $item) {
       // Print the values in a html list as configured by field settings.
       $list_elements = array();
-      // TODO do these listings more intelligent ;-).
-      if ($settings['show_nb_visits']) {
-        $list_elements[] = t('Visits: %count', array('%count' => $item['nb_visits']));
-      }
-      if ($settings['show_nb_hits']) {
-        $list_elements[] = t('Hits: %count', array('%count' => $item['nb_hits']));
-      }
-      if ($settings['show_entry_nb_visits']) {
-        $list_elements[] = t('Entry visits: %count', array('%count' => $item['entry_nb_visits']));
-      }
-      if ($settings['show_entry_nb_actions']) {
-        $list_elements[] = t('Entry hits: %count', array('%count' => $item['entry_nb_actions']));
-      }
-      if ($settings['show_entry_sum_visit_length']) {
-        $list_elements[] = t('Visit length: %count', array('%count' => $item['entry_sum_visit_length']));
-      }
-      if ($settings['show_entry_bounce_count']) {
-        $list_elements[] = t('Bounce count: %count', array('%count' => $item['entry_bounce_count']));
-      }
-      if ($settings['show_exit_nb_visits']) {
-        $list_elements[] = t('Exiting visits: %count', array('%count' => $item['exit_nb_visits']));
-      }
-      if ($settings['show_sum_time_spent']) {
-        $list_elements[] = t('Time spend: %count', array('%count' => $item['sum_time_spent']));
-      }
-      if ($settings['show_bounce_rate']) {
-        $list_elements[] = t('Bounce rate: %count%', array('%count' => $item['bounce_rate']));
-      }
-      if ($settings['show_exit_rate']) {
-        $list_elements[] = t('Exit rate: %count%', array('%count' => $item['exit_rate']));
+      // Get descriptions for piwik value keys.
+      $descriptions = piwik_stats_keyed_descriptions();
+      // Iterate trough all describing keys.
+      foreach ($descriptions as $key => $description) {
+        if ($settings[$key]) {
+          // Set the statistical value depending on its type.
+          if ($key == 'entry_sum_visit_length' || $key == 'sum_time_spent') {
+            // Format value as date intervall.
+            $list_elements[] = $description . ': ' . format_interval($item[$key]);
+          }
+          elseif ($key == 'exit_rate' || $key == 'bounce_rate') {
+            // Format as percent value.
+            $list_elements[] = $description . ': ' . $item[$key] . '%';
+          }
+          else {
+            // None formatted value.
+            $list_elements[] = $description . ': ' . $item[$key];
+          }
+        }
       }
       $element[$delta] = array(
         '#theme' => 'item_list',
@@ -447,7 +496,7 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
         // Add the filled piwik stats field to the entity.
         $entity->$field_name = $piwik_stats_field;
 
-        // Save the updated piwik fields.
+        // Save the updated piwik field.
         field_attach_update($field_instance['entity_type'], $entity);
       }
     }
@@ -626,4 +675,26 @@ function _piwik_stats_summarize_field($urls, $xml) {
   }
 
   return $stats;
+}
+
+/**
+ * Helper function that returns an array of keyed text
+ * describing piwik statistic key values.
+ *
+ * @return array
+ *   A keyed description array.
+ */
+function piwik_stats_keyed_descriptions() {
+  return array(
+    'nb_visits' => t('Visits'),
+    'nb_hits' => t('Hits'),
+    'entry_nb_visits' => t('Entry visits'),
+    'entry_nb_actions' => t('Entry hits'),
+    'entry_sum_visit_length' => t('Visit length'),
+    'entry_bounce_count' => t('Bounce count'),
+    'exit_nb_visits' => t('Exiting visits'),
+    'sum_time_spent' => t('Time spend'),
+    'bounce_rate' => t('Bounce rate'),
+    'exit_rate' => t('Exit rate'),
+  );
 }
