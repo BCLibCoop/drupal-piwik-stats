@@ -92,8 +92,7 @@ function piwik_stats_tab_page($entity_type, $entity) {
     if ($field_info['type'] == 'piwik_stats') {
       // Grab it's contents.
       $field = $entity->$field_name;
-      $language = (empty($entity->language)) ? LANGUAGE_NONE : $entity->language;
-      $field_contents = (isset($field[$language][0])) ? $field[$language][0] : array();
+      $field_contents = (isset($field[LANGUAGE_NONE][0])) ? $field[LANGUAGE_NONE][0] : array();
 
       // Set table caption, headers and some other needed default values.
       $tables[$field_name] = array(
@@ -549,7 +548,7 @@ function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $p
           'date' => $date,
           'format' => $format,
           'token_auth' => $token_auth,
-          'expanded' => TRUE,
+          'expanded' => 1,
         ),
       )
     )
@@ -630,61 +629,62 @@ function _piwik_stats_get_aliases($uri) {
  */
 function _piwik_stats_summarize_field($urls, $xml) {
   // Initialize field values as needed.
-  $stats = array();
-  $stats['und'][0]['nb_visits'] = 0;
-  $stats['und'][0]['nb_hits'] = 0;
-  $stats['und'][0]['entry_nb_visits'] = 0;
-  $stats['und'][0]['entry_nb_actions'] = 0;
-  $stats['und'][0]['entry_sum_visit_length'] = 0;
-  $stats['und'][0]['entry_bounce_count'] = 0;
-  $stats['und'][0]['exit_nb_visits'] = 0;
-  $stats['und'][0]['sum_time_spent'] = 0;
-  $stats['und'][0]['bounce_rate'] = 0;
-  $stats['und'][0]['exit_rate'] = 0;
+  $stats = array(
+    'nb_visits'=> 0,
+    'nb_hits'=> 0,
+    'entry_nb_visits'=> 0,
+    'entry_nb_actions'=> 0,
+    'entry_sum_visit_length'=> 0,
+    'entry_bounce_count'=> 0,
+    'exit_nb_visits'=> 0,
+    'sum_time_spent'=> 0,
+    'bounce_rate'=> 0,
+    'exit_rate'=> 0,
+  );
 
   // Iterate thorugh all url aliases and sum up statistics.
   foreach ($urls as $url) {
     // Grab statistical data from XML per URL.
     $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
-
+    dsm(print_r($url_stats, TRUE));
     if (! empty($url_stats)) {
       // The following values are integers and can be summed up easily.
       if (isset($url_stats[0]->nb_visits)) {
-        $stats['und'][0]['nb_visits'] += $url_stats[0]->nb_visits;
+        $stats['nb_visits'] += $url_stats[0]->nb_visits;
       }
       if (isset($url_stats[0]->nb_hits)) {
-        $stats['und'][0]['nb_hits'] += $url_stats[0]->nb_hits;
+        $stats['nb_hits'] += $url_stats[0]->nb_hits;
       }
       if (isset($url_stats[0]->entry_nb_visits)) {
-        $stats['und'][0]['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
+        $stats['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
       }
       if (isset($url_stats[0]->entry_nb_actions)) {
-        $stats['und'][0]['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
+        $stats['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
       }
       if (isset($url_stats[0]->entry_sum_visit_length)) {
-        $stats['und'][0]['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
+        $stats['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
       }
       if (isset($url_stats[0]->entry_bounce_count)) {
-        $stats['und'][0]['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
+        $stats['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
       }
       if (isset($url_stats[0]->exit_nb_visits)) {
-        $stats['und'][0]['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
+        $stats['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
       }
       if (isset($url_stats[0]->sum_time_spent)) {
-        $stats['und'][0]['sum_time_spent'] += $url_stats[0]->sum_time_spent;
+        $stats['sum_time_spent'] += $url_stats[0]->sum_time_spent;
       }
       // These two are percent values (##% formatted).
       // We need to transform them to integers before we can sum them.
       if (isset($url_stats[0]->bounce_rate)) {
-        $stats['und'][0]['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
+        $stats['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
       }
       if (isset($url_stats[0]->exit_rate)) {
-        $stats['und'][0]['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
+        $stats['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
       }
     }
   }
 
-  return $stats;
+  return array(LANGUAGE_NONE => array($stats));
 }
 
 /**
