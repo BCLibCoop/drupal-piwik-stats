@@ -2,8 +2,6 @@
 /**
  * @file
  * Integrates piwik statistics as entity field.
- *
- * TODO Implement a full views integration.
  */
 
 /**
@@ -646,7 +644,6 @@ function _piwik_stats_summarize_field($urls, $xml) {
   foreach ($urls as $url) {
     // Grab statistical data from XML per URL.
     $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
-    dsm(print_r($url_stats, TRUE));
     if (! empty($url_stats)) {
       // The following values are integers and can be summed up easily.
       if (isset($url_stats[0]->nb_visits)) {
