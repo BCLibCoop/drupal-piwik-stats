@@ -578,10 +578,10 @@ function _piwik_stats_get_entities($type, $bundle) {
   $select = db_select($entity_info['base table'], 'b');
   $select->addField('b', $entity_info['entity keys']['id']);
   // Some entity tables neither have revisisons nor bundles.
-  if (! empty($entity_info['entity keys']['revision'])) {
+  if (!empty($entity_info['entity keys']['revision'])) {
     $select->addField('b', $entity_info['entity keys']['revision']);
   }
-  if (! empty($entity_info['entity keys']['bundle'])) {
+  if (!empty($entity_info['entity keys']['bundle'])) {
     $select->addField('b', $entity_info['entity keys']['bundle']);
     $select->condition('b.type', $bundle);
   }
@@ -647,39 +647,20 @@ function _piwik_stats_summarize_field($urls, $xml) {
   foreach ($urls as $url) {
     // Grab statistical data from XML per URL.
     $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
-    if (! empty($url_stats)) {
-      // The following values are integers and can be summed up easily.
-      if (isset($url_stats[0]->nb_visits)) {
-        $stats['nb_visits'] += $url_stats[0]->nb_visits;
-      }
-      if (isset($url_stats[0]->nb_hits)) {
-        $stats['nb_hits'] += $url_stats[0]->nb_hits;
-      }
-      if (isset($url_stats[0]->entry_nb_visits)) {
-        $stats['entry_nb_visits'] += $url_stats[0]->entry_nb_visits;
-      }
-      if (isset($url_stats[0]->entry_nb_actions)) {
-        $stats['entry_nb_actions'] += $url_stats[0]->entry_nb_actions;
-      }
-      if (isset($url_stats[0]->entry_sum_visit_length)) {
-        $stats['entry_sum_visit_length'] += $url_stats[0]->entry_sum_visit_length;
-      }
-      if (isset($url_stats[0]->entry_bounce_count)) {
-        $stats['entry_bounce_count'] += $url_stats[0]->entry_bounce_count;
-      }
-      if (isset($url_stats[0]->exit_nb_visits)) {
-        $stats['exit_nb_visits'] += $url_stats[0]->exit_nb_visits;
-      }
-      if (isset($url_stats[0]->sum_time_spent)) {
-        $stats['sum_time_spent'] += $url_stats[0]->sum_time_spent;
-      }
-      // These two are percent values (##% formatted).
-      // We need to transform them to integers before we can sum them.
-      if (isset($url_stats[0]->bounce_rate)) {
-        $stats['bounce_rate'] += (int) drupal_substr($url_stats[0]->bounce_rate, 0, -1);
-      }
-      if (isset($url_stats[0]->exit_rate)) {
-        $stats['exit_rate'] += (int) drupal_substr($url_stats[0]->exit_rate, 0, -1);
+    if (!empty($url_stats)) {
+      // Sum up each statistical value.
+      foreach ($stats as $stat_key => &$stat) {
+        if (isset($url_stats[0]->$stat_key)) {
+          // These two are percent values (##% formatted).
+          // We need to transform them to integers before we can sum them.
+          if ($stat_key == 'bounce_rate' || $stat_key == 'exit_rate') {
+            $stat += (int) drupal_substr($url_stats[0]->$stat_key, 0, -1);
+          }
+          // The following values are integers and can be summed up easily.
+          else {
+            $stat += $url_stats[0]->$stat_key;
+          }
+        }
       }
     }
   }
