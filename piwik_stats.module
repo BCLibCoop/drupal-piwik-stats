@@ -481,7 +481,7 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
       return PIWIK_STATS_ERROR_XML;
     }
     elseif (empty($xml)) {
-      // If there is no data returned, we will process with the next one.
+      // If there is no data returned, we will proceed with the next one.
       continue;
     }
 
@@ -590,9 +590,6 @@ function _piwik_stats_get_entities($type, $bundle) {
   if (!empty($entity_info['entity keys']['bundle'])) {
     $select->addField('b', $entity_info['entity keys']['bundle']);
     $select->condition('b.type', $bundle);
-  }
-  if ($type == 'node') {
-    $select->addField('b', 'status');
   }
   $entities = $select->execute()->fetchAll();
   return $entities;
