@@ -516,8 +516,6 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
 /**
  * Sends a Piwik API request.
  *
- * TODO Think about caching response data here.
- *
  * @param string $piwik_url
  *   URL to piwik.
  * @param string $token_auth
@@ -538,29 +536,37 @@ function piwik_stats_fill_fields($token_auth, $site_id, $piwik_url) {
  *   The returned object of drupal_http_request().
  */
 function _piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml') {
-  $result_object = drupal_http_request(
-    url($piwik_url,
-      array(
-        'query' => array(
-          'module' => 'API',
-          'method' => $method,
-          'idSite' => $site_id,
-          'period' => $period,
-          'date' => $date,
-          'format' => $format,
-          'token_auth' => $token_auth,
-          'expanded' => 1,
-        ),
+  // Check whether this request has already been done.
+  $static_cache_key = $piwik_url . $method . $period . $date . $format;
+  static $results;
+  if (empty($results)) {
+    $results = array();
+  }
+  // First time this data has been requested.
+  if (!isset($results[$static_cache_key])) {
+    // Send off the API request (and cache the results).
+    $results[$static_cache_key] = drupal_http_request(
+      url($piwik_url,
+        array(
+          'query' => array(
+            'module' => 'API',
+            'method' => $method,
+            'idSite' => $site_id,
+            'period' => $period,
+            'date' => $date,
+            'format' => $format,
+            'token_auth' => $token_auth,
+            'expanded' => 1,
+          ),
+        )
       )
-    )
-  );
-  return $result_object;
+    );
+  }
+  return $results[$static_cache_key];
 }
 
 /**
  * Returns a list of entity objects only holding entity id's.
- *
- * TODO Think about caching data here.
  *
  * @param string $type
  *   The entity type.
