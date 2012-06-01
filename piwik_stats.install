@@ -23,7 +23,7 @@ function piwik_stats_field_schema($field) {
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'Pageviews.',
+        'description' => 'Overall pageviews.',
       ),
       'entry_nb_visits' => array(
         'type' => 'int',
@@ -90,4 +90,5 @@ function piwik_stats_uninstall() {
   // Delete used variables.
   variable_del('piwik_stats_token_auth');
   variable_del('piwik_stats_cron_fill');
+  variable_del('piwik_stats_cron_fill_time');
 }

@@ -12,8 +12,8 @@ This module pulls statistics from piwik and stores them to fields of any entity
  - Configurable 'period' parameter for each field
  - Full Views integration to build things like "Top5 Viewed Nodes"
  - Statistics summary tab on nodes and users
- - Refresh statistics on cron run or on demand
- - Currently tested with latest Version of Piwik (1.6)
+ - Refresh statistics on cron (queued) run or on demand (batch)
+ - Currently tested with latest Version of Piwik (1.8)
 
 
 -- REQUESTED DATA --

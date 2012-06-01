@@ -19,75 +19,50 @@ function piwik_stats_field_views_data($field) {
       $data_field_name = str_replace($field['field_name'] . '_', '', $data_field_fullname);
 
       // Get piwik keyed descriptions.
-      $piwik_descriptions = piwik_stats_keyed_descriptions();
+      $definitions = piwik_stats_definitions();
 
-      switch ($data_field_name) {
-        // Simple integer value fields.
-        case 'nb_visits':
-        case 'nb_hits':
-        case 'entry_nb_visits':
-        case 'entry_nb_actions':
-        case 'entry_bounce_count':
-        case 'exit_nb_visits':
-          // Modify title fields.
-          $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field information, so views will regard this as usable field.
-          $data_field['field'] = array(
-            'table' => $data_table,
-            'handler' => 'views_handler_field_numeric',
-            'click sortable' => TRUE,
-            'field_name' => $data_field_fullname,
-            'real field' => $data_field_fullname,
-            'is revision' => FALSE,
-            'entity_tables' => array(
-              'node' => 'node',
-              'node_revisions' => 'node',
-            ),
-          );
-          break;
+      if (isset($definitions[$data_field_name])) {
+        $definition = $definitions[$data_field_name];
 
-        // Date value fields.
-        case 'entry_sum_visit_length':
-        case 'sum_time_spent':
-          // Modify title fields.
-          $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field information, so views will regard this as usable field.
-          $data_field['field'] = array(
-            'table' => $data_table,
-            'handler' => 'views_handler_field_time_interval',
-            'click sortable' => TRUE,
-            'field_name' => $data_field_fullname,
-            'real field' => $data_field_fullname,
-            'is revision' => FALSE,
-            'entity_tables' => array(
-              'node' => 'node',
-              'node_revisions' => 'node',
-            ),
-          );
-          break;
+        // Add field information, so views will regard this as usable field.
+        $data_field['field'] = array(
+          'table' => $data_table,
+          'click sortable' => TRUE,
+          'field_name' => $data_field_fullname,
+          'real field' => $data_field_fullname,
+          'is revision' => FALSE,
+          'entity_tables' => array(
+            'node' => 'node',
+            'node_revisions' => 'node',
+          ),
+        );
 
-        // Percent value fields.
-        case 'bounce_rate':
-        case 'exit_rate':
-          // Modify title fields.
-          $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $piwik_descriptions[$data_field_name] . ' %', $data_field['title']);
-          $data_field['title short'] = str_replace($data_field_name, $piwik_descriptions[$data_field_name], $data_field['title']);
-          // Add field information, so views will regard this as usable field.
-          $data_field['field'] = array(
-            'table' => $data_table,
-            'handler' => 'views_handler_field_numeric',
-            'click sortable' => TRUE,
-            'field_name' => $data_field_fullname,
-            'real field' => $data_field_fullname,
-            'is revision' => FALSE,
-            'entity_tables' => array(
-              'node' => 'node',
-              'node_revisions' => 'node',
-            ),
-          );
-          break;
+        switch ($definition['format']) {
+          case 'number':
+            // Modify title field.
+            $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $definition['title'], $data_field['title']);
+            $data_field['title short'] = $definition['title'];
+            // Set the proper handler.
+            $data_field['field']['handler'] = 'views_handler_field_numeric';
+            break;
+
+          case 'seconds':
+            // Modify title field.
+            $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $definition['title'], $data_field['title']);
+            $data_field['title short'] = $definition['title'];
+            // Set the proper handler.
+            $data_field['field']['handler'] = 'views_handler_field_time_interval';
+            break;
+
+          case 'percent':
+            // Modify title field.
+            $data_field['title'] = str_replace($field['field_name'] . ':' . $data_field_name, $definition['title'] . ' %', $data_field['title']);
+            $data_field['title short'] = $definition['title'];
+            // Set the proper handler.
+            $data_field['field']['handler'] = 'views_handler_field_numeric';
+            break;
+
+        }
       }
     }
   }
