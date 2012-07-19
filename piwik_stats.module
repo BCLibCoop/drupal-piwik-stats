@@ -511,8 +511,25 @@ function piwik_stats_process_queue_item($item) {
     // Add the filled piwik stats field to the entity.
     $item['entity']->$item['field']['field_name'] = $piwik_stats_field;
 
-    // Save the updated piwik field.
-    field_attach_update($item['entity_type'], $item['entity']);
+    // Save the updated piwik field (without touching the node or any other fields).
+    _piwik_stats_field_update($item['entity_type'], $item['entity'], $item['field']);
+  }
+}
+
+/**
+ * Saves a piwik field without touching any other fields.
+ */
+function _piwik_stats_field_update($entity_type, $entity, $field) {
+  list($id, $vid, $bundle) = entity_extract_ids($entity_type, $entity);
+
+  // Get the storage backend used by the field.
+  $storage_info = field_info_storage_types($field['storage']['type']);
+  // Invoke the proper storage backend.
+  module_invoke($storage_info['module'], 'field_storage_write', $entity_type, $entity, FIELD_STORAGE_UPDATE, array($field['id'] => $field['id']));
+
+  $entity_info = entity_get_info($entity_type);
+  if ($entity_info['field cache']) {
+    cache_clear_all("field:$entity_type:$id", 'cache_field');
   }
 }
 
