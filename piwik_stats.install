@@ -91,4 +91,5 @@ function piwik_stats_uninstall() {
   variable_del('piwik_stats_token_auth');
   variable_del('piwik_stats_cron_fill');
   variable_del('piwik_stats_cron_fill_time');
+  variable_del('piwik_stats_request_timeout');
 }
