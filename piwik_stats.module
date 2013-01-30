@@ -432,6 +432,8 @@ function piwik_stats_cron() {
       foreach ($items as $item) {
         $queue->createItem($item);
       }
+      // We want some fresh statistics, remove cached data.
+      db_delete('cache')->condition('cid', 'piwik_stats:xml:%', 'LIKE')->execute();
     }
   }
   else {
