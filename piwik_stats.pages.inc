@@ -30,6 +30,11 @@ function piwik_stats_tab_page($entity_type, $entity) {
 
     // Check if we've got a piwik stats field here.
     if ($field_info['type'] == 'piwik_stats') {
+      if (!$field_info['settings']['show_in_statistics_page']) {
+        // Jump over fields that have been disabled to show on the stat page.
+        continue;
+      }
+
       // Grab it's contents.
       $field = $entity->$field_name;
       $field_contents = (isset($field[LANGUAGE_NONE][0])) ? $field[LANGUAGE_NONE][0] : array();

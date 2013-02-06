@@ -93,3 +93,21 @@ function piwik_stats_uninstall() {
   variable_del('piwik_stats_cron_fill_time');
   variable_del('piwik_stats_request_timeout');
 }
+
+/**
+ * Update piwik_stats field settings as 'show_in_statistics_page' was added.
+ */
+function piwik_stats_update_7101() {
+  // Get all piwik_stats fields.
+  $fields = field_read_fields(array(
+    'type' => 'piwik_stats',
+  ));
+
+  // Iterate through all existing field tables and alter them as needed.
+  foreach ($fields as $field) {
+    // Set the default values for the new setting.
+    $field['settings']['show_in_statistics_page'] = TRUE;
+    // Update the field config.
+    field_update_field($field);
+  }
+}
