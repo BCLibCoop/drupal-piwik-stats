@@ -432,7 +432,7 @@ function piwik_stats_piwik_admin_settings_form_submit($form, &$form_state) {
  */
 function piwik_stats_piwik_admin_settings_batch_submit($form, &$form_state) {
   // We want some fresh data here, remove cached data.
-  db_delete('cache')->condition('cid', 'piwik_stats:xml:%', 'LIKE')->execute();
+  cache_clear_all('piwik_stats:xml:', 'cache', TRUE);
 
   // Get the queue of fields to fill.
   $queue = piwik_stats_get_queue_items();
