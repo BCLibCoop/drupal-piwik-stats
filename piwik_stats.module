@@ -19,7 +19,7 @@
  *    Supported formats are
  *    - 'number': Simple numbers.
  *    - 'seconds': Number of seconds.
- *    - 'percent': Percentual value. 
+ *    - 'percent': Percentual value.
  */
 function piwik_stats_definitions() {
   return array(
@@ -145,7 +145,7 @@ function piwik_stats_tab_page_access($entity_type, $entity) {
  *  How the value should be formatted.
  *   - 'number': Simple numbers.
  *   - 'seconds': Number of seconds.
- *   - 'percent': Percentual value. 
+ *   - 'percent': Percentual value.
  */
 function piwik_stats_format_value($value, $format) {
   switch ($format) {
@@ -615,12 +615,19 @@ function piwik_stats_get_xml_data($field) {
       $result = $cache;
     }
     else {
+      $url = variable_get('piwik_url_http');
+      $token = variable_get('piwik_stats_token_auth');
+      $site_id = variable_get('piwik_site_id');
+      // Check if connection credentials are provided.
+      if (isset($url, $token, $site_id)) {
+        return FALSE;
+      }
       // Request piwik XML data.
       $result = piwik_stats_api_request(
-        variable_get('piwik_url_http', ''),
-        variable_get('piwik_stats_token_auth', ''),
+        $url,
+        $token,
         'Actions.getPageUrls',
-        variable_get('piwik_site_id', 0),
+        $site_id,
         $field['settings']['period']
       );
       // Check HTTP status code of response.
