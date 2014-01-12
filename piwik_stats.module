@@ -619,7 +619,7 @@ function piwik_stats_get_xml_data($field) {
       $token = variable_get('piwik_stats_token_auth');
       $site_id = variable_get('piwik_site_id');
       // Check if connection credentials are provided.
-      if (isset($url, $token, $site_id)) {
+      if (!isset($url, $token, $site_id)) {
         return FALSE;
       }
       // Request piwik XML data.
