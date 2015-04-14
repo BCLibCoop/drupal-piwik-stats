@@ -184,7 +184,6 @@ function piwik_stats_field_info() {
       'default_widget' => 'piwik_stats_hidden',
       'default_formatter' => 'piwik_stats_list',
       'settings' => array(
-        'sub_url' => '',
         'period' => 'day',
         'show_in_statistics_page' => TRUE,
       ),
@@ -197,12 +196,6 @@ function piwik_stats_field_info() {
  */
 function piwik_stats_field_settings_form($field, $instance, $has_data) {
   $settings = $field['settings'];
-  $form['sub_url'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Sub URL'),
-    '#default_value' => $settings['sub_url'],
-    '#description' => t('Track the default URL + sub URL (for example: /add /delete /usage) instead of the default URL .'),
-  );
   // Add field settings for statistic period.
   $form['period'] = array(
     '#type' => 'select',
@@ -566,7 +559,7 @@ function piwik_stats_process_queue_item($item) {
     // Get the default URI of the current entity.
     $entity_uri = entity_uri($item['entity_type'], $item['entity']);
     // Get all URL aliases linked to the entity URI.
-    $urls = _piwik_stats_get_aliases($entity_uri['path'], $item['field']['settings']['sub_url']);
+    $urls = _piwik_stats_get_aliases($entity_uri['path']);
 
     // Sum up all statistical data of each URL to a piwik field.
     $piwik_stats_field = _piwik_stats_summarize_field($urls, $xml);
@@ -743,7 +736,7 @@ function _piwik_stats_get_entities($type, $bundle) {
  * @return array
  *  An array of url aliases.
  */
-function _piwik_stats_get_aliases($uri, $sub_url) {
+function _piwik_stats_get_aliases($uri) {
   // The URLs we get from piwik are absolute, so we transform them as needed.
   $urls = array(url($uri, array('absolute' => TRUE, 'alias' => TRUE)));
 
@@ -753,7 +746,7 @@ function _piwik_stats_get_aliases($uri, $sub_url) {
   $select->condition('u.source', $uri);
   $aliases = $select->execute()->fetchAll();
   foreach ($aliases as $alias) {
-    $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE)) . $sub_url;
+    $urls[] = url($alias->alias, array('absolute' => TRUE, 'alias' => TRUE));
   }
 
   return $urls;
@@ -782,7 +775,6 @@ function _piwik_stats_summarize_field($urls, $xml) {
   foreach ($urls as $url) {
     // Grab statistical data from XML per URL.
     $url_stats = $xml->xpath('//url[text()="' . $url . '"]/..');
-    //$url_stats = $xml->xpath('//url[starts-with(text(), "' . $url . '")]/..');
     if (!empty($url_stats)) {
       // Sum up each statistical value.
       foreach ($definitions as $stat_key => $definition) {
