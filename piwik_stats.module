@@ -695,7 +695,7 @@ function piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $pe
           'format' => $format,
           'token_auth' => $token_auth,
           'expanded' => TRUE,
-          'limit' => -1,
+          'filter_limit' => -1,
         ),
       )
     ),
