@@ -638,11 +638,16 @@ function piwik_stats_get_xml_data($field) {
         $field['settings']['period']
       );
       // Check HTTP status code of response.
-      if ($result->code != 200 || $result->headers['content-type'] != 'text/xml; charset=utf-8') {
-        watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @code.',
-          array('@code' => $result->code), WATCHDOG_ERROR);
+      if ($result->code != 200) {
+        $error = isset($result->error) ? "$result->code: $result->error" : $result->code;
+        watchdog('piwik_stats', 'Requesting Piwik Statistics failed: HTTP returned: @error.', array('@error' => $error), WATCHDOG_ERROR);
         return FALSE;
       }
+      if ($result->headers['content-type'] != 'text/xml; charset=utf-8') {
+        watchdog('piwik_stats', 'Requesting Piwik Statistics does not return expected data format.', array(), WATCHDOG_ERROR);
+        return FALSE;
+      }
+
       cache_set('piwik_stats:xml:' . $field['settings']['period'], $result->data, 'cache_piwik_stats');
     }
 
