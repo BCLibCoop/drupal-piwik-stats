@@ -83,10 +83,16 @@ function piwik_stats_field_schema($field) {
         'default' => 0,
         'description' => 'Ratio of visitors that do not view any other page after this node (in percent).',
       ),
+      'download_actions' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'Number of download actions per node, from monthly report period.',
+      ),
     ),
     'indexes' => array(
       'visits' => array('nb_visits', 'entry_nb_visits', 'exit_nb_visits'),
-      'hits' => array('nb_hits', 'entry_nb_actions'),
+      'hits' => array('nb_hits', 'entry_nb_actions', 'download_actions'),
       'rate' => array('bounce_rate', 'exit_rate'),
     ),
   );

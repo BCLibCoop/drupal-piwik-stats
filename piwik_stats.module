@@ -73,6 +73,11 @@ function piwik_stats_definitions() {
       'description' => t('Ratio of visitors that do not view any other page after this node (in percent).'),
       'format' => 'percent',
     ),
+    'download_actions' => array(
+      'title' => t('Number of downloads'),
+      'description' => t('Number of download actions per node, from monthly report period.'),
+      'format' => 'number',
+    ),
   );
 }
 
@@ -613,6 +618,7 @@ function piwik_stats_get_xml_data($field) {
   if (empty($xml)) {
     $xml = array();
   }
+  
   // Check whether we already got this XML object in cache.
   if (!isset($xml[$field['settings']['period']])) {
 
@@ -625,18 +631,34 @@ function piwik_stats_get_xml_data($field) {
       $url = variable_get('piwik_url_http');
       $token = variable_get('piwik_stats_token_auth');
       $site_id = variable_get('piwik_site_id');
+      //$download_id = variable_get('toolshed_piwik_download_dimid');
       // Check if connection credentials are provided.
       if (!isset($url, $token, $site_id)) {
         return FALSE;
       }
-      // Request piwik XML data.
-      $result = piwik_stats_api_request(
-        $url,
-        $token,
-        'Actions.getPageUrls',
-        $site_id,
-        $field['settings']['period']
-      );
+
+	// Request piwik XML data.
+	$download = piwik_stats_api_request(
+		$url,
+		$token,
+		'CustomDimensions.getCustomDimension',
+		$site_id,
+		$field['settings']['period'],
+		'last1',
+		'xml',
+		'1', //$download_id,
+		'downloads'
+	);
+
+	// Request piwik XML data.
+	$result = piwik_stats_api_request(
+		$url,
+		$token,
+		'Actions.getPageUrls',
+		$site_id,
+		$field['settings']['period']
+	);
+      }
       // Check HTTP status code of response.
       if ($result->code != 200) {
         $error = isset($result->error) ? "$result->code: $result->error" : $result->code;
@@ -649,17 +671,43 @@ function piwik_stats_get_xml_data($field) {
       }
 
       cache_set('piwik_stats:xml:' . $field['settings']['period'], $result->data, 'cache_piwik_stats');
+      cache_set('piwik_dl_stats:xml:' . $field['settings']['period'], $download->data, 'cache_piwik_stats');
     }
-
+    
     // Parse XML data.
     $xml[$field['settings']['period']] = new SimpleXMLElement($result->data);
-    // Be shure that there is really some data to work with.
+    $xml_to_merge = new SimpleXMLElement($download->data);
+     
+    dpm( $xml[$field['settings']['period']], "result: ");
+    dpm( $xml_to_merge->row, "download: ");
+
+
+/*	foreach ($result->data->row->subtable as $item => $child ) {
+
+		$rkey = stripslashes($child->label);
+		$match = preg_match('/\/\w+\/([\w-]+)', $rkey);
+		$dkey = $match[0];
+
+		//check return value for failed preg_match
+		if (! empty($dkey) ) {
+			//$download->row->label or ..->subtable->row->label (fq url?)
+			$item->$child->addChild('download_actions', $download->row->$dkey->{'nb_hits'});
+			dpm($item->$child->{'download_actions'});
+		}
+
+		dpm($item, "item: ");
+		dpm($child, "child: ");
+		dpm($rkey, "rkey: ");
+		dpm($dkey, "dkey: ");
+	}
+*/
+    
+    // Be sure that there is really some data to work with.
     if (isset($xml[$field['settings']['period']]->error)) {
       watchdog('piwik_stats', 'Requesting Piwik Statistics failed: Could not parse XML.',
         array(), WATCHDOG_ERROR);
       return FAlSE;
     }
-  }
 
   return $xml[$field['settings']['period']];
 }
@@ -686,7 +734,7 @@ function piwik_stats_get_xml_data($field) {
  * @return object
  *  The returned object of drupal_http_request().
  */
-function piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml') {
+function piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $period = 'year', $date = 'now', $format = 'xml', $idDim = NULL, $action = NULL) {
   // Send off the API request.
   return drupal_http_request(
     url($piwik_url,
@@ -701,6 +749,8 @@ function piwik_stats_api_request($piwik_url, $token_auth, $method, $site_id, $pe
           'token_auth' => $token_auth,
           'expanded' => TRUE,
           'filter_limit' => -1,
+	  'idDimension' => $idDim,
+	  'actionType' => $action
         ),
       )
     ),
@@ -776,9 +826,7 @@ function _piwik_stats_get_aliases($uri) {
 
   return $urls;
 }
-
-/**
- * Summarizes all statistical data from XML with matching URLs.
+ /* Summarizes all statistical data from XML with matching URLs.
  *
  * @param array $urls
  *  An array of url aliases.
@@ -795,7 +843,7 @@ function _piwik_stats_summarize_field($urls, $xml) {
   foreach ($definitions as $stat_key => $definition) {
     $stats[$stat_key] = 0;
   }
-
+  dpm($urls, "urls: ");
   // Iterate thorugh all url aliases and sum up statistics.
   foreach ($urls as $url) {
     // Grab statistical data from XML per URL.
